@@ -71,10 +71,135 @@ $$ LANGUAGE plpgsql;
 
 
 -- inserciones complejas
+CREATE OR REPLACE PROCEDURE registrar_usuario_completo(
+    p_nombre VARCHAR,
+    p_correo VARCHAR,
+    p_id_sede INT,
+    p_telefono VARCHAR,
+    p_fecha_nacimiento DATE,
+    p_id_membresia INT,
+    p_metodo_pago VARCHAR,
+    OUT p_id_usuario INT
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_fecha_registro DATE:= CURRENT_DATE;
+    v_fecha_inicio DATE:= CURRENT_DATE;
+    v_duracion_dias INT;
+    v_fecha_fin DATE;
+    v_precio NUMERIC(10,2);
+    v_id_metodo_pago INT;
+BEGIN
+BEGIN
+    INSERT INTO usuarios(nombre, correo, id_sede, telefono, fecha_nacimiento, fecha_registro)
+    VALUES(p_nombre, p_correo, p_id_sede, p_telefono, p_fecha_nacimiento, v_fecha_registro)
+    RETURNING id INTO p_id_usuario;
 
+    SELECT duracion_dias, precio INTO v_duracion_dias, v_precio
+    FROM membresias 
+    WHERE id = p_id_membresia;
+
+    v_fecha_fin := v_fecha_inicio + (v_duracion_dias || ' days')::INTERVAL;
+
+    INSERT INTO usuarios_membresias(id_usuario, id_membresia, fecha_inicio, fecha_fin)
+    VALUES(p_id_usuario, p_id_membresia, v_fecha_inicio, v_fecha_fin);
+
+    SELECT id INTO v_id_metodo_pago
+    FROM metodos_pagos
+    WHERE nombre = p_metodo_pago;
+
+    IF v_id_metodo_pago IS NULL THEN
+            SELECT id INTO v_id_metodo_pago 
+            FROM metodos_pagos
+            WHERE nombre = 'Efectivo';
+    END IF;
+
+    INSERT INTO pagos(id_usuario, monto, fecha_pago, metodo_pago)
+    VALUES(p_id_usuario, v_precio, v_fecha_registro, v_id_metodo_pago);
+
+    COMMIT;
+
+     RAISE NOTICE 'Usuario % registrado exitosamente con ID %', p_nombre, p_id_usuario;
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            RAISE EXCEPTION 'Error al registrar usuario: %', SQLERRM;
+    END;
+END;
+$$;
 
 
 -- actualizacion o eliminación con validaciones 
+
+CREATE OR REPLACE PROCEDURE cancelar_reserva_clase(
+    p_id_reserva INT, 
+    p_id_usuario INT,
+    OUT p_resultado VARCHAR
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_fecha_clase DATE;
+    v_hora_inicio TIME;
+    v_tiempo_actual TIMESTAMP := NOW();
+    v_propietario_reserva INT;
+    v_estado_membresia VARCHAR;
+BEGIN
+    SELECT rc.id_usuario, h.fecha, h.hora_inicio
+    INTO v_propietario_reserva, v_fecha_clase, v_hora_inicio
+    FROM reserva_clases rc
+    JOIN horarios h ON rc.id_horario = h.id
+    WHERE rc.id = p_id_reserva;
+
+    IF v_propietario_reserva IS NULL THEN
+        p_resultado := 'ERROR: LA RESERVA NO EXISTE';
+        RETURN;
+    END IF;
+
+    IF v_propietario_reserva != p_id_usuario THEN
+        p_resultado := 'ERROR: LA RESERVA NO COINCIDE CON EL USUARIO INDICADO';
+        RETURN;
+    END IF;
+
+    IF (v_fecha_clase < CURRENT_DATE) OR 
+       (v_fecha_clase = CURRENT_DATE AND v_hora_inicio <= CURRENT_TIME) THEN
+        p_resultado := 'Error: No se puede cancelar una clase que ya pasó o está en curso';
+        RETURN;
+    END IF;
+
+    IF (v_fecha_clase || ' ' || v_hora_inicio)::TIMESTAMP - v_tiempo_actual < INTERVAL '24 hours' THEN
+        p_resultado := 'ERROR: Las cancelaciones deben hacerse con al menos 24 horas de anticipación';
+        RETURN;
+    END IF;
+    
+    SELECT estado_membres(p_id_usuario) INTO v_estado_membresia;
+    
+    IF v_estado_membresia != 'VIGENTE' AND v_estado_membresia != 'A PUNTO DE VENCER' THEN
+        p_resultado := 'Error: No se puede cancelar la reserva porque la membresía está vencida';
+        RETURN;
+    END IF;
+
+    BEGIN 
+        DELETE FROM reserva_clases WHERE id = p_id_reserva;
+        IF FOUND THEN
+            p_resultado := 'Reserva cancelada exitosamente';
+        ELSE
+            p_resultado := 'Error: No se pudo cancelar la reserva';
+        END IF;
+        
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            p_resultado := 'Error: ' || SQLERRM;
+    END;
+END;
+$$;
+
+
+
+
 
 
 
