@@ -199,13 +199,24 @@ $$;
 
 
 
-
-
-
-
-
 ------------------------- 4 Vistas -------------------
 -- vista simple
+-- vista_usuarios con id, nombre, correo, sede y fecha_registro
+CREATE OR REPLACE VIEW vista_usuarios AS
+SELECT u.id, u.nombre, u.correo, s.nombre AS sede, u.fecha_registro
+FROM usuarios u
+LEFT JOIN sedes s ON u.id_sede = s.id;
+
+-- JOIN y GROUP BY
+-- contador de reservas por cada clase 
+CREATE  OR REPLACE VIEW vista_reservas_por_clase AS
+SELECT c.nombre AS clase, COUNT(rc.id) AS total_reservas
+FROM reserva_clases rc
+JOIN horarios h ON rc.id_horario = h.id
+JOIN clases c ON h.id_clase = c.id
+GROUP BY c.nombre
+ORDER BY total_reservas DESC;
+
 
 -- JOIN y GROUP BY
 
@@ -217,6 +228,35 @@ $$;
 
 
 -- BEFORE
+-- validar que existan cupos en una clase antes de insertar una reserva
+CREATE OR REPLACE FUNCTION trigger_validar_cupos()
+RETURNS TRIGGER AS $$
+DECLARE
+    cupo_actual INT;
+    cupo_max INT;
+BEGIN   
+    SELECT COUNT(*) INTO cupo_actual
+    FROM reserva_clases
+    WHERE id_horario = NEW.id_horario;
+
+    SELECT h.cupo_max INTO cupo_max
+    FROM horarios h
+    WHERE h.id = NEW.id_horario;
+
+    IF cupo_actual >= cupo_max THEN
+        RAISE EXCEPTION 'No hay cupos disponibles para la clase %', NEW.id_horario;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_validar_cupos
+BEFORE INSERT ON reserva_clases
+FOR EACH ROW
+EXECUTE FUNCTION trigger_validar_cupos();
+
+
+
 
 
 -- AFTER
