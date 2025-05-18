@@ -237,7 +237,10 @@ ORDER BY
 -- expresiones como CASE, COALESCE, etc.
 --Vista que clasifica usuarios según su estado de membresía
 CREATE OR REPLACE VIEW vista_estado_usuarios AS
-SELECT u.id, u.nombre, u.correo,
+SELECT 
+    u.id, 
+    u.nombre, 
+    u.correo,
     CASE
         WHEN estado_membres(u.id) = 'VIGENTE' THEN 'Cliente Activo'
         WHEN estado_membres(u.id) = 'A PUNTO DE VENCER' THEN 'Requiere Renovacion'
@@ -246,8 +249,17 @@ SELECT u.id, u.nombre, u.correo,
     END AS estado_cliente,
     COALESCE(m.nombre, 'Ninguna') AS tipo_membresia,
     COALESCE(TO_CHAR(um.fecha_fin, 'DD/MM/YYYY'), 'N/A') AS fecha_vencimiento
-FROM usuarios u
-LEFT JOIN usuarios_membresias um ON u.id = um.id_usuario AND um.fecha_fin >= CURRENT_DATE
+FROM 
+    usuarios u
+LEFT JOIN (
+    SELECT um1.*
+    FROM usuarios_membresias um1
+    INNER JOIN (
+        SELECT id_usuario, MAX(fecha_fin) as max_fecha_fin
+        FROM usuarios_membresias
+        GROUP BY id_usuario
+    ) um2 ON um1.id_usuario = um2.id_usuario AND um1.fecha_fin = um2.max_fecha_fin
+) um ON u.id = um.id_usuario
 LEFT JOIN membresias m ON um.id_membresia = m.id;
 
 
