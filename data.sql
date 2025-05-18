@@ -396,7 +396,7 @@ VALUES
 (50, 49, '2023-02-14'),
 (1, 50, '2023-02-10');
 
-insert into metodos_pago(nombre)
+insert into metodos_pagos(nombre)
 VALUES
 ('Efectivo'),
 ('Tarjeta de Crédito'),

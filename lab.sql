@@ -207,6 +207,7 @@ SELECT u.id, u.nombre, u.correo, s.nombre AS sede, u.fecha_registro
 FROM usuarios u
 LEFT JOIN sedes s ON u.id_sede = s.id;
 
+
 -- JOIN y GROUP BY
 -- contador de reservas por cada clase 
 CREATE  OR REPLACE VIEW vista_reservas_por_clase AS
@@ -232,6 +233,7 @@ JOIN sedes s ON h.id_sede = s.id
 ORDER BY 
     u.id, h.fecha DESC, h.hora_inicio;
 
+
 -- expresiones como CASE, COALESCE, etc.
 --Vista que clasifica usuarios según su estado de membresía
 CREATE OR REPLACE VIEW vista_estado_usuarios AS
@@ -247,6 +249,7 @@ SELECT u.id, u.nombre, u.correo,
 FROM usuarios u
 LEFT JOIN usuarios_membresias um ON u.id = um.id_usuario AND um.fecha_fin >= CURRENT_DATE
 LEFT JOIN membresias m ON um.id_membresia = m.id;
+
 
 ------------------------- 2 triggers  ---------------
 
@@ -281,9 +284,8 @@ EXECUTE FUNCTION trigger_validar_cupos();
 
 
 
-
-
 -- AFTER
+--Registra y actualiza estado de máquinas cuando una clase es muy reservada
 CREATE OR REPLACE FUNCTION actualizar_estado_maquinas()
 RETURNS TRIGGER AS $$
 DECLARE v_id_clase INT; v_nombre_clase VARCHAR; v_conteo_reservas INT; v_mantenimiento INT:=10;
