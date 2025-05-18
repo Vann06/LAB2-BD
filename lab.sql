@@ -5,7 +5,7 @@
 
 -- funcion que retorne valor escalar
 -- retorna el total de pagos realizados por un usuario
-CREATE OR REPLACE FUNCTION total_pagos_usuarios(p_id_usuario)
+CREATE OR REPLACE FUNCTION total_pagos_usuarios(p_id_usuario INT)
 RETURNS NUMERIC(10,2) as $$
 DECLARE
     total NUMERIC(10,2);
@@ -91,29 +91,29 @@ DECLARE
     v_precio NUMERIC(10,2);
     v_id_metodo_pago INT;
 BEGIN
-BEGIN
-    INSERT INTO usuarios(nombre, correo, id_sede, telefono, fecha_nacimiento, fecha_registro)
-    VALUES(p_nombre, p_correo, p_id_sede, p_telefono, p_fecha_nacimiento, v_fecha_registro)
-    RETURNING id INTO p_id_usuario;
+    BEGIN
+        INSERT INTO usuarios(nombre, correo, id_sede, telefono, fecha_nacimiento, fecha_registro)
+        VALUES(p_nombre, p_correo, p_id_sede, p_telefono, p_fecha_nacimiento, v_fecha_registro)
+        RETURNING id INTO p_id_usuario;
 
-    SELECT duracion_dias, precio INTO v_duracion_dias, v_precio
-    FROM membresias 
-    WHERE id = p_id_membresia;
+        SELECT duracion_dias, precio INTO v_duracion_dias, v_precio
+        FROM membresias 
+        WHERE id = p_id_membresia;
 
-    v_fecha_fin := v_fecha_inicio + (v_duracion_dias || ' days')::INTERVAL;
+        v_fecha_fin := v_fecha_inicio + (v_duracion_dias || ' days')::INTERVAL;
 
-    INSERT INTO usuarios_membresias(id_usuario, id_membresia, fecha_inicio, fecha_fin)
-    VALUES(p_id_usuario, p_id_membresia, v_fecha_inicio, v_fecha_fin);
+        INSERT INTO usuarios_membresias(id_usuario, id_membresia, fecha_inicio, fecha_fin)
+        VALUES(p_id_usuario, p_id_membresia, v_fecha_inicio, v_fecha_fin);
 
-    SELECT id INTO v_id_metodo_pago
-    FROM metodos_pagos
-    WHERE nombre = p_metodo_pago;
+        SELECT id INTO v_id_metodo_pago
+        FROM metodos_pagos
+        WHERE nombre = p_metodo_pago;
 
-    IF v_id_metodo_pago IS NULL THEN
-            SELECT id INTO v_id_metodo_pago 
-            FROM metodos_pagos
-            WHERE nombre = 'Efectivo';
-    END IF;
+        IF v_id_metodo_pago IS NULL THEN
+                SELECT id INTO v_id_metodo_pago 
+                FROM metodos_pagos
+                WHERE nombre = 'Efectivo';
+        END IF;
 
     INSERT INTO pagos(id_usuario, monto, fecha_pago, metodo_pago)
     VALUES(p_id_usuario, v_precio, v_fecha_registro, v_id_metodo_pago);
@@ -219,10 +219,34 @@ ORDER BY total_reservas DESC;
 
 
 -- JOIN y GROUP BY
+--Vista que muestra el historial de clases por usuario
+CREATE OR REPLACE VIEW vista_historial_clases AS
+SELECT u.id as id_usuario, u.nombre AS nombre_usuario, c.nombre AS clase, h.fecha, h.hora_inicio, h.hora_fin, t.nombre AS instructor, s.nombre AS sede
+FROM 
+    usuarios u 
+JOIN reserva_clases rc ON u.id = rc.id_usuario
+JOIN horarios h ON rc.id_horario = h.id
+JOIN clases c ON h.id_clase = c.id
+JOIN trabajadores t ON h.id_trabajador = t.id
+JOIN sedes s ON h.id_sede = s.id
+ORDER BY 
+    u.id, h.fecha DESC, h.hora_inicio;
 
 -- expresiones como CASE, COALESCE, etc.
-
-
+--Vista que clasifica usuarios según su estado de membresía
+CREATE OR REPLACE VIEW vista_estado_usuarios AS
+SELECT u.id, u.nombre, u.correo,
+    CASE
+        WHEN estado_membres(u.id) = 'VIGENTE' THEN 'Cliente Activo'
+        WHEN estado_membres(u.id) = 'A PUNTO DE VENCER' THEN 'Requiere Renovacion'
+        WHEN estado_membres(u.id) = 'VENCIDA' THEN 'Cliente Inactivo'
+        ELSE 'Sin Membresia'
+    END AS estado_cliente,
+    COALESCE(m.nombre, 'Ninguna') AS tipo_membresia,
+    COALESCE(TO_CHAR(um.fecha_fin, 'DD/MM/YYYY'), 'N/A') AS fecha_vencimiento
+FROM usuarios u
+LEFT JOIN usuarios_membresias um ON u.id = um.id_usuario AND um.fecha_fin >= CURRENT_DATE
+LEFT JOIN membresias m ON um.id_membresia = m.id;
 
 ------------------------- 2 triggers  ---------------
 
@@ -260,3 +284,42 @@ EXECUTE FUNCTION trigger_validar_cupos();
 
 
 -- AFTER
+CREATE OR REPLACE FUNCTION actualizar_estado_maquinas()
+RETURNS TRIGGER AS $$
+DECLARE v_id_clase INT; v_nombre_clase VARCHAR; v_conteo_reservas INT; v_mantenimiento INT:=10;
+BEGIN 
+    SELECT h.id_clase, c.nombre INTO v_id_clase, v_nombre_clase
+    FROM horarios h
+    JOIN clases c ON h.id_clase = c.id
+    WHERE h.id = NEW.id_horario;
+
+    SELECT COUNT(*) INTO v_conteo_reservas
+    FROM reserva_clases rc
+    JOIN horarios h ON rc.id_horario = h.id
+    WHERE h.id_clase = v_id_clase;
+
+    IF v_conteo_reservas >= v_mantenimiento THEN
+        UPDATE maquinas
+        SET estado = 2
+        WHERE id_sede = (SELECT id_sede FROM horarios WHERE id = NEW.id_horario)
+        AND estado = 1
+        AND id IN(
+            SELECT id FROM maquinas 
+            WHERE id_sede = (SELECT id_sede FROM horarios WHERE id = NEW.id_horario)
+            AND estado = 1
+            LIMIT 1
+        );
+
+        RAISE NOTICE 'MANTENIMIENTO PROGRAMADO: La clase % ha alcanzado % reservas. Se ha programado mantenimiento para máquinas en la sede %',
+                    v_nombre_clase, v_conteo_reservas, (SELECT id_sede FROM horarios WHERE id = NEW.id_horario);
+    END IF;
+
+    RETURN NULL;
+
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_actualizar_estado_maquinas
+AFTER INSERT ON reserva_clases
+FOR EACH ROW
+EXECUTE FUNCTION actualizar_estado_maquinas();
