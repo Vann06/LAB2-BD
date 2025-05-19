@@ -19,7 +19,7 @@ El sistema implementa características avanzadas de PostgreSQL como procedimient
 
 ## Estructura de la Base de Datos
 
-![Modelo Relacional](https://www.postgresqltutorial.com/wp-content/uploads/2018/03/PostgreSQL-Sample-Database.png)
+[Modelo Relacional](https://dbdiagram.io/d/LAB2-BD-6812b5091ca52373f50bfab2)
 
 ### Tablas Principales
 
@@ -80,7 +80,7 @@ La base de datos implementa un esquema relacional con:
 
 ## Instalación y Configuración
 
-![PostgreSQL Installation](https://www.postgresql.org/docs/current/tutorial-install.html)
+[instalacion de Postgres](https://www.postgresql.org/docs/current/tutorial-install.html)
 
 1. Crear una nueva base de datos PostgreSQL
 2. Ejecutar el script DDL para crear el esquema de la base de datos:
