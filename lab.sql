@@ -19,6 +19,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+/* 
+EJEMPLO DE USO:
+-- Obtener el total de pagos del usuario con ID 1
+SELECT total_pagos_usuarios(1);
+
+-- Usar el resultado en una consulta
+SELECT u.nombre, total_pagos_usuarios(u.id) as total_pagado
+FROM usuarios u
+WHERE u.id = 1;
+*/
+
 
 -- funcion que retorne un conjunto de resultados
 -- retorna las clases reservadas por un usuario
@@ -33,6 +44,19 @@ BEGIN
     WHERE rc.id_usuario = p_id_usuario;
 END;
 $$ LANGUAGE plpgsql;
+
+/* 
+EJEMPLO DE USO:
+-- Obtener todas las clases reservadas por el usuario con ID 2
+SELECT * FROM clases_reservadas(2);
+
+-- Filtrar las clases que ocurren hoy
+SELECT * FROM clases_reservadas(2)
+WHERE fecha = CURRENT_DATE;
+
+-- Contar el número de clases reservadas por ese usuario
+SELECT COUNT(*) FROM clases_reservadas(2);
+*/
 
 -- funcion con multiples parametros o logica condicional 
 -- verifica el estado de la ultima membresia de un usuario
@@ -64,6 +88,21 @@ BEGIN
     RETURN estado;
 END;
 $$ LANGUAGE plpgsql;
+
+/* 
+EJEMPLO DE USO:
+-- Verificar el estado de la membresía de un usuario específico
+SELECT estado_membres(3);
+
+-- Obtener una lista de todos los usuarios con su estado de membresía
+SELECT id, nombre, estado_membres(id) as estado_membresia
+FROM usuarios;
+
+-- Filtrar usuarios según el estado de su membresía
+SELECT id, nombre 
+FROM usuarios
+WHERE estado_membres(id) = 'VIGENTE';
+*/
 
 
 
@@ -128,6 +167,29 @@ BEGIN
     END;
 END;
 $$;
+
+/* 
+EJEMPLO DE USO:
+-- Registrar un nuevo usuario completo con todos los datos
+DO $$
+DECLARE
+    v_id_usuario INT;
+BEGIN
+    CALL registrar_usuario_completo(
+        'Juan Pérez',               -- nombre
+        'juan.perez@email.com',     -- correo
+        1,                          -- id_sede
+        '5555-1234',                -- telefono
+        '1990-05-15',               -- fecha_nacimiento
+        2,                          -- id_membresia
+        'Tarjeta de crédito',       -- metodo_pago
+        v_id_usuario                -- variable para recibir el ID generado
+    );
+    
+    -- Mostrar el ID del usuario generado
+    RAISE NOTICE 'El ID del nuevo usuario es: %', v_id_usuario;
+END $$;
+*/
 
 
 -- actualizacion o eliminación con validaciones 
@@ -197,6 +259,27 @@ BEGIN
 END;
 $$;
 
+/* 
+EJEMPLO DE USO:
+-- Cancelar una reserva de clase
+DO $$
+DECLARE
+    v_resultado VARCHAR;
+BEGIN
+    CALL cancelar_reserva_clase(
+        5,              -- ID de la reserva a cancelar
+        2,              -- ID del usuario que quiere cancelar
+        v_resultado     -- Variable que recibirá el resultado
+    );
+    
+    -- Mostrar el resultado de la operación
+    RAISE NOTICE 'Resultado: %', v_resultado;
+END $$;
+
+-- Verificar si la reserva fue cancelada
+SELECT * FROM reserva_clases WHERE id = 5;
+*/
+
 
 
 ------------------------- 4 Vistas -------------------
@@ -206,6 +289,21 @@ CREATE OR REPLACE VIEW vista_usuarios AS
 SELECT u.id, u.nombre, u.correo, s.nombre AS sede, u.fecha_registro
 FROM usuarios u
 LEFT JOIN sedes s ON u.id_sede = s.id;
+
+/* 
+EJEMPLO DE USO:
+-- Consultar todos los usuarios con su información básica
+SELECT * FROM vista_usuarios;
+
+-- Filtrar usuarios de una sede específica
+SELECT * FROM vista_usuarios 
+WHERE sede = 'Sede Central';
+
+-- Obtener los 10 usuarios más recientes
+SELECT * FROM vista_usuarios 
+ORDER BY fecha_registro DESC 
+LIMIT 10;
+*/
 
 
 -- JOIN y GROUP BY
@@ -217,6 +315,20 @@ JOIN horarios h ON rc.id_horario = h.id
 JOIN clases c ON h.id_clase = c.id
 GROUP BY c.nombre
 ORDER BY total_reservas DESC;
+
+/* 
+EJEMPLO DE USO:
+-- Ver todas las clases ordenadas por su popularidad
+SELECT * FROM vista_reservas_por_clase;
+
+-- Identificar las 3 clases más populares
+SELECT * FROM vista_reservas_por_clase
+LIMIT 3;
+
+-- Encontrar clases con más de 5 reservas
+SELECT * FROM vista_reservas_por_clase
+WHERE total_reservas > 5;
+*/
 
 
 -- JOIN y GROUP BY
@@ -232,6 +344,28 @@ JOIN trabajadores t ON h.id_trabajador = t.id
 JOIN sedes s ON h.id_sede = s.id
 ORDER BY 
     u.id, h.fecha DESC, h.hora_inicio;
+
+/* 
+EJEMPLO DE USO:
+-- Ver historial completo de clases de todos los usuarios
+SELECT * FROM vista_historial_clases;
+
+-- Filtrar historial de un usuario específico
+SELECT * FROM vista_historial_clases
+WHERE id_usuario = 3;
+
+-- Ver historial de clases de un tipo específico
+SELECT * FROM vista_historial_clases
+WHERE clase = 'Yoga';
+
+-- Ver historial de clases por sede
+SELECT * FROM vista_historial_clases
+WHERE sede = 'Sede Norte';
+
+-- Ver clases programadas para una fecha específica
+SELECT * FROM vista_historial_clases
+WHERE fecha = '2025-05-20';
+*/
 
 
 -- expresiones como CASE, COALESCE, etc.
@@ -261,6 +395,28 @@ LEFT JOIN (
     ) um2 ON um1.id_usuario = um2.id_usuario AND um1.fecha_fin = um2.max_fecha_fin
 ) um ON u.id = um.id_usuario
 LEFT JOIN membresias m ON um.id_membresia = m.id;
+
+/* 
+EJEMPLO DE USO:
+-- Ver estado de todos los usuarios
+SELECT * FROM vista_estado_usuarios;
+
+-- Filtrar usuarios activos
+SELECT * FROM vista_estado_usuarios
+WHERE estado_cliente = 'Cliente Activo';
+
+-- Identificar usuarios que necesitan renovar
+SELECT * FROM vista_estado_usuarios
+WHERE estado_cliente = 'Requiere Renovacion';
+
+-- Buscar usuarios sin membresía
+SELECT * FROM vista_estado_usuarios
+WHERE estado_cliente = 'Sin Membresia';
+
+-- Filtrar por tipo de membresía
+SELECT * FROM vista_estado_usuarios
+WHERE tipo_membresia = 'Premium';
+*/
 
 
 ------------------------- 2 triggers  ---------------
@@ -293,6 +449,28 @@ CREATE TRIGGER trigger_validar_cupos
 BEFORE INSERT ON reserva_clases
 FOR EACH ROW
 EXECUTE FUNCTION trigger_validar_cupos();
+
+/* 
+EJEMPLO DE USO:
+-- Este trigger se activa automáticamente al intentar insertar una nueva reserva
+
+-- Ejemplo de inserción que activará el trigger
+INSERT INTO reserva_clases (id_usuario, id_horario, fecha_reserva)
+VALUES (1, 5, CURRENT_TIMESTAMP);
+
+-- Para comprobar el funcionamiento del trigger podemos:
+-- 1. Ver el cupo máximo de una clase
+SELECT id, cupo_max FROM horarios WHERE id = 5;
+
+-- 2. Ver cuántas reservas tiene actualmente
+SELECT COUNT(*) FROM reserva_clases WHERE id_horario = 5;
+
+-- 3. Intentar insertar cuando ya está lleno para ver el error
+-- (Suponiendo que ya hay 'cupo_max' reservas)
+INSERT INTO reserva_clases (id_usuario, id_horario, fecha_reserva)
+VALUES (2, 5, CURRENT_TIMESTAMP);
+-- Esto debería mostrar el error: 'No hay cupos disponibles para la clase 5'
+*/
 
 
 
@@ -337,3 +515,23 @@ CREATE TRIGGER trigger_actualizar_estado_maquinas
 AFTER INSERT ON reserva_clases
 FOR EACH ROW
 EXECUTE FUNCTION actualizar_estado_maquinas();
+
+/* 
+EJEMPLO DE USO:
+-- Este trigger se ejecuta automáticamente después de insertar una nueva reserva de clase
+
+-- Para probar el trigger, podemos:
+-- 1. Verificar el estado actual de las máquinas
+SELECT id, nombre, estado FROM maquinas WHERE id_sede = 1 AND estado = 1;
+
+-- 2. Insertar varias reservas para una misma clase hasta llegar al umbral de mantenimiento
+-- (Necesitamos insertar al menos 10 reservas para la misma clase)
+INSERT INTO reserva_clases (id_usuario, id_horario, fecha_reserva)
+VALUES (3, 7, CURRENT_TIMESTAMP);
+
+-- 3. Verificar si alguna máquina cambió a estado de mantenimiento (estado = 2)
+SELECT id, nombre, estado FROM maquinas WHERE id_sede = 1 AND estado = 2;
+
+-- Nota: El trigger cambiará el estado de una máquina solo cuando las reservas 
+-- para una misma clase alcancen o superen el umbral de 10 reservas.
+*/
