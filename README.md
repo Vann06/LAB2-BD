@@ -80,7 +80,7 @@ La base de datos implementa un esquema relacional con:
 
 ## Instalación y Configuración
 
-![PostgreSQL Installation](https://miro.medium.com/max/4800/1*oNwwfLHGSZZK_tFJfTY7iA.webp)
+![PostgreSQL Installation](https://www.postgresql.org/docs/current/tutorial-install.html)
 
 1. Crear una nueva base de datos PostgreSQL
 2. Ejecutar el script DDL para crear el esquema de la base de datos:
