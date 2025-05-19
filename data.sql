@@ -520,3 +520,19 @@ VALUES
 ('Bosu', 'Equipo para entrenamiento de estabilidad', 48, 1, 600.00),
 ('Fitball', 'Balón para ejercicios de estabilidad', 49, 1, 400.00),
 ('Baldas para Steps', 'Plataformas ajustables para steps', 50, 1, 1000.00);
+
+-- Asegura que haya exactamente 15 reservas (si ya hay algunas, completa el resto)
+INSERT INTO reserva_clases(id_usuario, id_horario, fecha_reserva)
+VALUES
+(17, 5, CURRENT_TIMESTAMP),
+(18, 5, CURRENT_TIMESTAMP),
+(19, 5, CURRENT_TIMESTAMP),
+(20, 5, CURRENT_TIMESTAMP),
+(21, 5, CURRENT_TIMESTAMP),
+(22, 5, CURRENT_TIMESTAMP),
+(23, 5, CURRENT_TIMESTAMP),
+(26, 5, CURRENT_TIMESTAMP),
+(27, 5, CURRENT_TIMESTAMP),
+(28, 5, CURRENT_TIMESTAMP),
+(29, 5, CURRENT_TIMESTAMP),
+(30, 5, CURRENT_TIMESTAMP);

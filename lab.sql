@@ -157,12 +157,10 @@ BEGIN
     INSERT INTO pagos(id_usuario, monto, fecha_pago, metodo_pago)
     VALUES(p_id_usuario, v_precio, v_fecha_registro, v_id_metodo_pago);
 
-    COMMIT;
 
      RAISE NOTICE 'Usuario % registrado exitosamente con ID %', p_nombre, p_id_usuario;
     EXCEPTION
         WHEN OTHERS THEN
-            ROLLBACK;
             RAISE EXCEPTION 'Error al registrar usuario: %', SQLERRM;
     END;
 END;
@@ -268,7 +266,7 @@ DECLARE
 BEGIN
     CALL cancelar_reserva_clase(
         5,              -- ID de la reserva a cancelar
-        2,              -- ID del usuario que quiere cancelar
+        2,             -- ID usuario (2 = erroneo, 5= usuario correcto)
         v_resultado     -- Variable que recibirá el resultado
     );
     
@@ -364,7 +362,7 @@ WHERE sede = 'Sede Norte';
 
 -- Ver clases programadas para una fecha específica
 SELECT * FROM vista_historial_clases
-WHERE fecha = '2025-05-20';
+WHERE fecha = '2025-02-19';
 */
 
 
@@ -405,13 +403,13 @@ SELECT * FROM vista_estado_usuarios;
 SELECT * FROM vista_estado_usuarios
 WHERE estado_cliente = 'Cliente Activo';
 
+-- Filtrar usuarios inactivos
+SELECT * FROM vista_estado_usuarios
+WHERE estado_cliente = 'Cliente Inactivo';
+
 -- Identificar usuarios que necesitan renovar
 SELECT * FROM vista_estado_usuarios
 WHERE estado_cliente = 'Requiere Renovacion';
-
--- Buscar usuarios sin membresía
-SELECT * FROM vista_estado_usuarios
-WHERE estado_cliente = 'Sin Membresia';
 
 -- Filtrar por tipo de membresía
 SELECT * FROM vista_estado_usuarios
